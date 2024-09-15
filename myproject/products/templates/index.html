@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление продуктами</title>
+</head>
+<title>Управление продуктами</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .form-container {
+        width: 50%;
+        margin-bottom: 20px;
+    }
+
+    form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    input, textarea {
+        padding: 5px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    button {
+        padding: 10px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        cursor: pointer;
+        width: 100%;
+    }
+
+    button:hover {
+        background-color: #45a049;
+    }
+
+    .table-container {
+        width: 100%;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+
+    th, td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+
+    th {
+        background-color: #f2f2f2;
+    }
+
+    #showAllProducts {
+        background-color: #008CBA;
+    }
+
+    #showAllProducts:hover {
+        background-color: #007B9A;
+    }
+</style>
+<body>
+<h1>Управление продуктами</h1>
+<div class="form-container">
+    <form method="POST" action="{% url 'add_product' %}">
+        {% csrf_token %}
+        <input type="text" id="name" name="name" placeholder="Название продукта" required>
+        <textarea id="description" name="description" placeholder="Описание продукта" required></textarea>
+        <input type="number" id="price" name="price" placeholder="Цена" step="0.01" required>
+        <button type="submit">Отправить</button>
+    </form>
+</div>
+
+<div class="table-container">
+    <h2>Список продуктов</h2>
+    <table id="productTable">
+        <thead>
+        <tr>
+            <th>Название</th>
+            <th>Описание</th>
+            <th>Цена</th>
+        </tr>
+        </thead>
+        <tbody id="productList"></tbody>
+    </table>
+    <button id="showAllProducts">Показать все продукты</button>
+</div>
+
+<script>
+    const API_URL = "{% url 'get_products' %}";
+    let products = [];
+
+    function addProduct(event) {
+        event.preventDefault();
+
+        const name = document.getElementById('name').value;
+        const description = document.getElementById('description').value;
+        const price = parseFloat(document.getElementById('price').value);
+
+
+        if (products.some(product => product.name === name)) {
+            alert('Продукт с таким именем уже существует.');
+            return;
+        }
+
+        if (price <= 0 || isNaN(price)) {
+            alert('Цена должна быть положительным числом.');
+            return;
+        }
+
+
+        fetch('{% url "add_product" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: `name=${encodeURIComponent(name)}&description=${encodeURIComponent(description)}&price=${price}`
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message === 'Продукт добавлен') {
+                    // Refresh product list
+                    fetchAllProducts();
+                    // Reset form
+                    document.getElementById('productForm').reset();
+                    alert(data.message);
+                } else {
+                    alert('Ошибка при добавлении продукта: ' + data.error);
+                }
+            })
+            .catch(error => console.error('Ошибка:', error));
+    }
+
+    window.onload = function () {
+        document.getElementById('showAllProducts').addEventListener('click', () => {
+            console.log('Кнопка нажата!');
+            fetchAllProducts();
+        });
+    }
+
+    async function fetchAllProducts() {
+        try {
+            const response = await fetch(API_URL);
+            console.log('Статус ответа:', response.status);  // Проверка статуса ответа
+            if (!response.ok) {
+                throw new Error('Ошибка при получении данных');
+            }
+            const data = await response.json();
+            console.log('Данные продуктов:', data);  // Проверка полученных данных
+            products = data;
+            updateProductList();
+        } catch (error) {
+            console.error('Ошибка:', error);
+            alert('Не удалось загрузить продукты. Пожалуйста, попробуйте позже.');
+        }
+    }
+
+    function updateProductList() {
+        const productList = document.getElementById('productList');
+        productList.innerHTML = '';  // Очищаем таблицу перед добавлением новых строк
+
+        products.forEach(product => {
+            console.log('Добавление продукта:', product);  // Проверка продукта перед добавлением
+            const row = document.createElement('tr');
+            row.innerHTML = `
+            <td>${product.name}</td>
+            <td>${product.description}</td>
+            <td>${typeof product.price === 'number' ? product.price.toFixed(2) : product.price}</td>
+        `;
+            productList.appendChild(row);
+        });
+    }
+
+    document.getElementById('productForm').addEventListener('submit', addProduct);
+    document.getElementById('showAllProducts').addEventListener('click', fetchAllProducts);
+
+    fetchAllProducts();
+
+</script>
+</body>
+</html>
